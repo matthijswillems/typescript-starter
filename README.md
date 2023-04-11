@@ -1,1 +1,1 @@
-# typescript-starter
+# plugin-starter
