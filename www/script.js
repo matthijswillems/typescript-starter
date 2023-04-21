@@ -2,9 +2,10 @@ import { createCube } from './index.js';
 
 //TODO: OnCreateFace optioneel maken, met aanwwijsbare slide ID.
 //TODO: CreateCustomSlide met slideIndex, lege div.
-
+console.log('creating settings from script.js v2');
 var myCube = createCube('#cubeContainer2', {
   id: 'myFirstCube',
+
   animationSpeed: 0.5,
   // Uncomment for demos
   // perspectiveFactor: [2],
@@ -18,7 +19,8 @@ document.addEventListener('cubeIndexUpdate', function (event) {
 });
 
 document.addEventListener('nextPredictedUpdate', function (event) {
-  // console.log('my event', event.detail);
+  if (event.detail.nextPredictedIndex !== event.detail.previousIndex)
+    console.log('my event', event.detail);
 });
 
 // Uncomment for demo

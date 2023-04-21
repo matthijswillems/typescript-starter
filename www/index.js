@@ -17,16 +17,18 @@ var __spreadValues = (a, b) => {
 
 // src/index.ts
 var createSettings = (userSettings, container) => {
-  console.log("userSettingsv4", userSettings);
+  console.log("creatingSettings from typescript plugin v2");
   const cubeContainer = document.querySelector(container);
   if (!cubeContainer)
     return false;
   const defaultSettings = {
+    creativeContainerId: "#creative_container",
     container: cubeContainer,
     cubeClass: ".cube",
     height: cubeContainer.clientHeight,
     width: cubeContainer.clientWidth,
     currentIndex: 0,
+    previousIndex: void 0,
     currentRotation: 0,
     direction: "x",
     perspectiveFactor: [0, 0, 3, 3, 1, 0.6, 0.45, 0.35, 0.3, 0.25, 0.2],
@@ -34,44 +36,34 @@ var createSettings = (userSettings, container) => {
     animationSpeed: 0.75,
     animationEase: "expo.out",
     // eslint-disable-next-line no-constant-condition
-    autoSlider: window.gsap ? gsap.timeline() : void 0,
+    autoSlider: gsap.timeline(),
     // eslint-disable-next-line no-constant-condition
-    currentAnimation: window.gsap ? gsap.timeline() : void 0,
+    currentAnimation: gsap.timeline(),
     liveDrag: 1,
     forcedEnd: false,
     isAnimating: false,
     onClick: false,
-    touchElement: null
+    touchElement: void 0
   };
   const combinedSettings = __spreadValues(__spreadValues({}, defaultSettings), userSettings);
   const cubeElement = combinedSettings.container.querySelector(combinedSettings.cubeClass);
+  if (!cubeElement)
+    return false;
   return __spreadValues(__spreadValues({}, combinedSettings), {
     cube: cubeElement,
     faces: cubeElement.children,
     amountOfFaces: cubeElement.children.length,
-    faceAngle: 360 / cubeElement.children.length,
-    nextPredictedIndex: 0
+    faceAngle: 360 / cubeElement.children.length
   });
-};
-var checkForErrors = (settings) => {
-  if (!settings.container) {
-    console.warn("The specified container can not be found, cube is not created");
-    return false;
-  }
-  if (!settings.currentAnimation || !settings.autoSlider) {
-    console.warn("GSAP dependency wasn't found, please add it to your project before using the Cube Plugin ");
-    return false;
-  }
-  return true;
 };
 var createCube = (container, userSettings) => {
   const cubeSettings = createSettings(userSettings, container);
-  if (cubeSettings && checkForErrors) {
+  if (!cubeSettings) {
+    throw "[CUBE PLUGIN] There's an error in your settings";
+  } else {
     createCubeFaces(cubeSettings);
     createTouchEvents(cubeSettings);
     return cubeSettings;
-  } else {
-    console.error("[CUBE PLUGIN] encountered an error, please view console info");
   }
 };
 var calculateAdjacent = ({ faceAngle, width }) => width / 2 / Math.tan(faceAngle / 2 * (Math.PI / 180));
@@ -125,10 +117,12 @@ var createTouchEvents = (cubeSettings) => {
         break;
       case "panmove":
         cubeSettings.nextPredictedIndex = getIndex(
-          localX > 0 ? "<" : ">",
+          localX > 0 ? -1 : 1,
           cubeSettings
         );
-        if (!document.querySelector("#creative_container").matches(":hover")) {
+        fireEvent("nextPredictedUpdate", cubeSettings);
+        const creativeContainer = document.querySelector(cubeSettings.creativeContainerId);
+        if (creativeContainer && !creativeContainer.matches(":hover")) {
           hammer.stop(true);
           cubeSettings.forcedEnd = true;
           cubeAnimation("edgeRelease", cubeSettings, localX);
@@ -157,10 +151,10 @@ var cubeAnimation = (type, cubeSettings, localX) => {
   } else {
     if (localX > cubeSettings.threshold) {
       cubeSettings.currentRotation = cubeSettings.currentRotation + cubeSettings.faceAngle;
-      updateIndex("<", cubeSettings);
+      updateIndex(-1, cubeSettings);
     } else if (localX < cubeSettings.threshold * -1) {
       cubeSettings.currentRotation = cubeSettings.currentRotation - cubeSettings.faceAngle;
-      updateIndex(">", cubeSettings);
+      updateIndex(1, cubeSettings);
     }
     cubeSettings.currentAnimation.add(
       gsap.to(cubeSettings.cube, {
@@ -180,14 +174,39 @@ function setAnimationState(boolean, cubeSettings) {
 }
 console.log("TODO: DIRECTION AANPASSEN");
 var getIndex = (direction, cubeSettings) => {
-  if (direction === "<")
-    return cubeSettings.currentIndex < 1 ? cubeSettings.amountOfFaces + (cubeSettings.currentIndex - 1) % cubeSettings.amountOfFaces : (cubeSettings.currentIndex - 1) % cubeSettings.amountOfFaces;
-  return (cubeSettings.currentIndex + 1) % cubeSettings.amountOfFaces;
+  return cubeSettings.currentIndex + direction < 0 ? cubeSettings.amountOfFaces + cubeSettings.currentIndex + direction : (cubeSettings.currentIndex + direction) % cubeSettings.amountOfFaces;
 };
 var updateIndex = (direction, cubeSettings) => {
+  cubeSettings.previousIndex = cubeSettings.currentIndex;
   cubeSettings.currentIndex = getIndex(direction, cubeSettings);
+  fireEvent("cubeIndexUpdate", cubeSettings);
 };
-new EventSource("/esbuild").addEventListener("change", () => location.reload());
+var fireEvent = (eventName, cubeSettings) => {
+  let event;
+  switch (eventName) {
+    case "cubeIndexUpdate":
+      event = new CustomEvent(eventName, {
+        detail: {
+          currentIndex: cubeSettings.currentIndex,
+          previousIndex: cubeSettings.previousIndex,
+          cubeSettings
+        }
+      });
+      document.dispatchEvent(event);
+      break;
+    case "nextPredictedUpdate":
+      event = new CustomEvent(eventName, {
+        detail: {
+          nextPredictedIndex: cubeSettings.nextPredictedIndex,
+          cubeSettings
+        }
+      });
+      document.dispatchEvent(event);
+      break;
+    default:
+      break;
+  }
+};
 export {
   createCube
 };

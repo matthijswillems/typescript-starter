@@ -3,6 +3,7 @@
 type indexDirection = 1 | -1;
 
 type userSettings = {
+  creativeContainerId: string;
   container: HTMLElement;
   cubeClass: string;
   height: number;
@@ -29,7 +30,7 @@ type userSettings = {
 
 type calculatedSettings = {
   cube: HTMLElement;
-  faces: HTMLCollection;
+  faces: HTMLElement[];
   amountOfFaces: number;
   faceAngle: number;
   nextPredictedIndex?: number;
@@ -40,12 +41,13 @@ type allSettings = userSettings & calculatedSettings;
 type events = "cubeIndexUpdate" | "nextPredictedUpdate";
 
 const createSettings = (userSettings: userSettings, container: string): allSettings | false => {
-  console.log('userSettingsv4', userSettings);
-  const cubeContainer: HTMLElement = document.querySelector(container);
+  console.log('creatingSettings from typescript plugin v2');
+  const cubeContainer: HTMLElement | null = document.querySelector(container);
 
   if (!cubeContainer) return false;
 
   const defaultSettings: userSettings = {
+    creativeContainerId: "#creative_container",
     container: cubeContainer,
     cubeClass: ".cube",
     height: cubeContainer.clientHeight,
@@ -59,24 +61,26 @@ const createSettings = (userSettings: userSettings, container: string): allSetti
     animationSpeed: 0.75,
     animationEase: "expo.out",
     // eslint-disable-next-line no-constant-condition
-    autoSlider: window.gsap ? gsap.timeline() : undefined,
+    autoSlider: gsap.timeline(),
     // eslint-disable-next-line no-constant-condition
-    currentAnimation: window.gsap ? gsap.timeline() : undefined,
+    currentAnimation: gsap.timeline(),
     liveDrag: 1,
     forcedEnd: false,
     isAnimating: false,
     onClick: false,
-    touchElement: null,
+    touchElement: undefined,
   };
 
   const combinedSettings = { ...defaultSettings, ...userSettings }
 
-  const cubeElement: HTMLElement = combinedSettings.container.querySelector(combinedSettings.cubeClass)
+  const cubeElement = combinedSettings.container.querySelector(combinedSettings.cubeClass) as calculatedSettings["cube"]
+
+  if (!cubeElement) return false;
 
   return {
     ...combinedSettings, ...{
       cube: cubeElement,
-      faces: cubeElement.children,
+      faces: cubeElement.children as unknown as HTMLElement[],
       amountOfFaces: cubeElement.children.length,
       faceAngle: 360 / cubeElement.children.length,
     }
@@ -99,16 +103,16 @@ const checkForErrors = (settings: allSettings): boolean => {
 const createCube = (container: string, userSettings: userSettings): allSettings => {
   const cubeSettings = createSettings(userSettings, container);
 
-  if (cubeSettings && checkForErrors) {
+  if (!cubeSettings) {
+    throw '[CUBE PLUGIN] There\'s an error in your settings';
+  } else {
     createCubeFaces(cubeSettings);
     createTouchEvents(cubeSettings);
     return cubeSettings;
-  } else {
-    console.error("[CUBE PLUGIN] encountered an error, please view console info")
   }
 };
 
-const calculateAdjacent = ({ faceAngle, width }): number =>
+const calculateAdjacent = ({ faceAngle, width }: allSettings): number =>
   width / 2 / Math.tan((faceAngle / 2) * (Math.PI / 180));
 
 const createCubeFaces = (cubeSettings: allSettings) => {
@@ -147,7 +151,7 @@ const createCubeFaces = (cubeSettings: allSettings) => {
   ];
 
   // Set face styling
-  Array.from(cubeSettings.faces).forEach((element: HTMLElement, index: number, array: Element[]) => {
+  Array.from(cubeSettings.faces).forEach((element, index, array) => {
     const rotationAngle = cubeSettings.faceAngle * index;
     //TODO: Direction inbouwen
     element.style.transform = `rotateY(${rotationAngle}deg) translate3d(0, 0, ${translate}px)`;
@@ -186,7 +190,10 @@ const createTouchEvents = (cubeSettings: allSettings) => {
         );
         fireEvent("nextPredictedUpdate", cubeSettings);
 
-        if (!document.querySelector("#creative_container").matches(":hover")) {
+        // eslint-disable-next-line no-case-declarations
+        const creativeContainer = document.querySelector(cubeSettings.creativeContainerId);
+
+        if (creativeContainer && !creativeContainer.matches(":hover")) {
           hammer.stop(true);
           cubeSettings.forcedEnd = true;
 
@@ -263,7 +270,8 @@ const updateIndex = (direction: indexDirection, cubeSettings: allSettings) => {
 }
 
 const fireEvent = (eventName: events, cubeSettings: allSettings) => {
-  let event;
+  let event: CustomEvent;
+
   switch (eventName) {
     case "cubeIndexUpdate":
       event = new CustomEvent(eventName, {
@@ -273,24 +281,20 @@ const fireEvent = (eventName: events, cubeSettings: allSettings) => {
           cubeSettings
         }
       });
+      document.dispatchEvent(event);
       break;
     case "nextPredictedUpdate":
       event = new CustomEvent(eventName, {
         detail: {
           nextPredictedIndex: cubeSettings.nextPredictedIndex,
-          previousIndex: cubeSettings.previousIndex,
           cubeSettings
         }
       });
+      document.dispatchEvent(event);
       break;
     default:
       break;
-
-
   }
-  document.dispatchEvent(event);
 }
 
 export { createCube };
-
-new EventSource('/esbuild').addEventListener('change', () => location.reload())

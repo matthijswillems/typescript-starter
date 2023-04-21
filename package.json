@@ -1,18 +1,21 @@
 {
-  "name": "typescript-starter",
-  "version": "1.0.0",
-  "description": "",
+  "name": "cube-plugin",
+  "version": "0.0.1",
+  "description": "A plugin that generates a 3D cube with listeners",
   "main": "index.ts",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "lint": "eslint 'src/*.ts'",
-    "build": "esbuild src/index.ts --outdir=dist/ --format=esm --bundle",
-    "postbuild": "echo build succesfully to dist folder",
-    "start": "yarn run lint && esbuild src/index.ts --outdir=www/ --format=esm --watch --bundle --servedir=www"
+    "prepublish": "eslint 'src/*.ts'",
+    "build": "esbuild src/index.ts --outdir=www --format=esm --bundle --tsconfig=./tsconfig.json --watch=forever & yarn run build:declaration",
+    "build:declaration": "tsc --emitDeclarationOnly --outDir www",
+    "serve": "browser-sync start --server 'www' --files 'www' --middleware 'bs-delay'",
+    "start": "yarn run build & yarn run serve"
   },
+  "types": "www/index.d.ts",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Myreage/typescript-starter.git"
+    "url": "git+https://#noginvullen"
   },
   "author": "",
   "license": "ISC",
@@ -30,7 +33,8 @@
     "eslint-config-prettier": "^8.5.0",
     "prettier": "^2.6.2",
     "prettier-eslint": "^15.0.1",
-    "typescript": "^4.6.4"
+    "typescript": "^4.6.4",
+    "browser-sync": "^2.29.1"
   },
   "dependencies": {}
 }
